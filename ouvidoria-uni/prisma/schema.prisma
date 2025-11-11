@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url     = env("DATABASE_URL")
+}
+
+enum ROLE {
+  admin
+  user
+}
+
+enum StatusOccurrence {
+  IN_PROGRESS
+  PROCEDING
+  NOT_PROCEDING
+  DONE
+  WAITING
+}
+
+model User {
+  id                Int     @id @default(autoincrement())
+  email             String  @unique
+  password_digested String
+  role              ROLE
+  name              String?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  Occurrence        Occurrence[]
+  category          Category?           @relation(fields: [categoryId], references: [id])
+  categoryId        Int?
+  OccurenceMessages OccurenceMessages[]
+
+  @@map("users")
+}
+
+model Type {
+  id   Int    @id @default(autoincrement())
+  name String
+
+  created_at DateTime     @default(now())
+  updated_at DateTime     @updatedAt
+  Occurrence Occurrence[]
+
+  @@map("types")
+}
+
+model Category {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique
+  extra_field  Boolean? @default(false)
+  extra_fields Json?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  Item       Item[]
+  User       User[]
+  Occurrence Occurrence[]
+
+  @@map("categories")
+}
+
+model Item {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  category   Category @relation(fields: [categoryId], references: [id])
+  categoryId Int
+
+  created_at DateTime     @default(now())
+  updated_at DateTime     @updatedAt
+  Occurrence Occurrence[]
+
+  @@map("items")
+}
+
+model Occurrence {
+  id           String @id @default(uuid())
+  title        String
+  description  String
+  rating       Int?
+  extra_fields Json?
+
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  assigned_in DateTime?
+  finished_in DateTime?
+
+  category           Category             @relation(fields: [categoryId], references: [id])
+  categoryId         Int
+  item               Item                 @relation(fields: [itemId], references: [id])
+  itemId             Int
+  type               Type?                @relation(fields: [typeId], references: [id])
+  typeId             Int?
+  status             StatusOccurrence     @default(WAITING)
+  user               User?                @relation(fields: [userId], references: [id])
+  userId             Int?
+  student            Student?             @relation(fields: [studentId], references: [id])
+  studentId          String?
+  OccurenceMessages  OccurenceMessages[]
+  ImagesOnOccurrence ImagesOnOccurrence[]
+
+  @@map("occurrences")
+}
+
+model Student {
+  id    String @id @default(uuid())
+  email String @unique
+  phone String @unique
+  name  String
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  Occurrence Occurrence[]
+
+  @@map("students")
+}
+
+model ImagesOnOccurrence {
+  occurrence   Occurrence? @relation(fields: [occurrenceId], references: [id])
+  occurrenceId String
+  image        Image       @relation(fields: [imageUrl], references: [url])
+  imageUrl     String
+
+  @@id([occurrenceId, imageUrl])
+  @@map("images_on_occurrence")
+}
+
+model OccurenceMessages {
+  id    Int    @id @default(autoincrement())
+  title String
+  text  String
+
+  create_at DateTime @default(now())
+  update_at DateTime @updatedAt
+
+  occurrence   Occurrence? @relation(fields: [occurrenceId], references: [id])
+  occurrenceId String?
+  user         User?       @relation(fields: [userId], references: [id])
+  userId       Int?
+
+  @@map("occurence_messages")
+}
+
+model Text {
+  identifier String
+  page       String
+  text       String
+
+  @@id([page, identifier])
+  @@map("texts")
+}
+
+model SiteImage {
+  identifier String
+  page       String
+  image      Image  @relation(fields: [imageUrl], references: [url])
+  imageUrl   String
+
+  @@id([page, identifier])
+  @@map("sites_images")
+}
+
+model Image {
+  url                String               @id
+  mime               String
+  width              Int?
+  height             Int?
+  SiteImages         SiteImage[]
+  ImagesOnOccurrence ImagesOnOccurrence[]
+
+  @@map("images")
+}
