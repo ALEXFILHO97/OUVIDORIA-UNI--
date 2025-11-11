@@ -3,8 +3,9 @@ import { authOptions } from "@/app/utils/auth";
 import prisma from "@/libs/prisma/prismaClient";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import SimpleDashboard from "@/app/components/Admin/SimpleDashboard";
 
-export default async function Item() {
+export default async function Relatorios() {
   const session = await getServerSession(authOptions);
 
   if (!session) {
@@ -24,15 +25,78 @@ export default async function Item() {
     redirect("/admin");
   }
 
-  const data = await prisma.type.findMany({
-    orderBy: {
-      name: "asc",
+  // Buscar dados iniciais para o dashboard
+  const [quantityData, categoryData, durationData] = await Promise.all([
+    prisma.occurrence.groupBy({
+      by: ["created_at"],
+      _count: {
+        id: true,
+      },
+      orderBy: {
+        created_at: "asc",
+      },
+    }),
+    prisma.occurrence.groupBy({
+      by: ["categoryId"],
+      _count: {
+        id: true,
+      },
+    }),
+    prisma.occurrence.findMany({
+      where: {
+        finished_in: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        created_at: true,
+        finished_in: true,
+        category: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    }),
+  ]);
+
+  const categories = await prisma.category.findMany({
+    where: {
+      id: {
+        in: categoryData.map((item) => item.categoryId),
+      },
     },
   });
 
-  if (!data) {
-    return <Spinner />;
-  }
+  const initialData = {
+    quantity: quantityData.map((item) => ({
+      date: item.created_at.toISOString(),
+      count: item._count.id,
+    })),
+    byCategory: categoryData.map((item) => {
+      const category = categories.find((cat) => cat.id === item.categoryId);
+      return {
+        category: category?.name || "Categoria não encontrada",
+        count: item._count.id,
+      };
+    }),
+    resolutionDuration: durationData.map((occurrence) => {
+      const created = new Date(occurrence.created_at);
+      const finished = new Date(occurrence.finished_in!);
+      const durationHours = Math.round(
+        (finished.getTime() - created.getTime()) / (1000 * 60 * 60)
+      );
+
+      return {
+        id: occurrence.id,
+        category: occurrence.category.name,
+        duration: durationHours,
+        created_at: occurrence.created_at.toISOString(),
+        finished_in: occurrence.finished_in!.toISOString(),
+      };
+    }),
+  };
 
   return (
     <>
@@ -41,6 +105,7 @@ export default async function Item() {
           Relatorios
         </h1>
       </div>
+      <SimpleDashboard initialData={initialData} />
     </>
   );
 }

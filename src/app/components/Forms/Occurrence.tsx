@@ -126,8 +126,9 @@ export default function FormOccurrence({
 
       setIdOccurrence(id);
     } catch (error: any) {
+      console.error("Erro ao criar ocorrência:", error);
       setErrorStatus(Number(error.message));
-      throw new Error(error.message);
+      toast.error("Erro ao enviar ocorrência. Tente novamente.");
     }
   }
 

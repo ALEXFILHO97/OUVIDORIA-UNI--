@@ -53,7 +53,7 @@ export async function POST(request: Request) {
           itemId: data.itemId,
           typeId: data.typeId,
           ImagesOnOccurrence: {
-            create: body.pictures.map((url: string) => ({
+            create: (body.pictures || []).map((url: string) => ({
               image: { connect: { url } },
             })),
           },
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
         extra_fields: body.extra_fields,
         itemId: data.itemId,
         ImagesOnOccurrence: {
-          create: body.pictures.map((url: string) => ({
+          create: (body.pictures || []).map((url: string) => ({
             image: { connect: { url } },
           })),
         },
@@ -85,7 +85,10 @@ export async function POST(request: Request) {
     await sendMailResponsible({ id: created.id });
     return NextResponse.json({ id: created.id }, { status: 201 });
   } catch (error) {
-    console.log(error);
-    return NextResponse.error;
+    console.error("Erro ao criar ocorrência:", error);
+    return NextResponse.json(
+      { error: "Erro interno do servidor" },
+      { status: 500 }
+    );
   }
 }
