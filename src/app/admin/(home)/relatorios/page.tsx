@@ -26,11 +26,10 @@ export default async function Relatorios() {
   }
 
   // Buscar dados iniciais para o dashboard
-  const [quantityData, categoryData, durationData] = await Promise.all([
-    prisma.occurrence.groupBy({
-      by: ["created_at"],
-      _count: {
-        id: true,
+  const [occurrences, categoryData, durationData] = await Promise.all([
+    prisma.occurrence.findMany({
+      select: {
+        created_at: true,
       },
       orderBy: {
         created_at: "asc",
@@ -61,6 +60,26 @@ export default async function Relatorios() {
     }),
   ]);
 
+  // Agrupar ocorrências por dia
+  const quantityByDay = occurrences.reduce((acc, occurrence) => {
+    const date = new Date(occurrence.created_at);
+    const dateKey = date.toISOString().split('T')[0];
+    
+    if (!acc[dateKey]) {
+      acc[dateKey] = 0;
+    }
+    acc[dateKey]++;
+    
+    return acc;
+  }, {} as Record<string, number>);
+
+  const quantityData = Object.entries(quantityByDay)
+    .map(([date, count]) => ({
+      date: new Date(date).toISOString(),
+      count: count,
+    }))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
   const categories = await prisma.category.findMany({
     where: {
       id: {
@@ -70,10 +89,7 @@ export default async function Relatorios() {
   });
 
   const initialData = {
-    quantity: quantityData.map((item) => ({
-      date: item.created_at.toISOString(),
-      count: item._count.id,
-    })),
+    quantity: quantityData,
     byCategory: categoryData.map((item) => {
       const category = categories.find((cat) => cat.id === item.categoryId);
       return {

@@ -23,24 +23,43 @@ export async function GET(request: NextRequest) {
 
     switch (reportType) {
       case "quantity":
-        const quantityData = await prisma.occurrence.groupBy({
-          by: ["created_at"],
+        // Buscar todas as ocorrências no período
+        const occurrences = await prisma.occurrence.findMany({
           where: whereClause,
-          _count: {
-            id: true,
+          select: {
+            created_at: true,
           },
           orderBy: {
             created_at: "asc",
           },
         });
 
+        // Agrupar por dia (ignorando hora, minuto, segundo)
+        const quantityByDay = occurrences.reduce((acc, occurrence) => {
+          const date = new Date(occurrence.created_at);
+          // Criar chave apenas com data (YYYY-MM-DD)
+          const dateKey = date.toISOString().split('T')[0];
+          
+          if (!acc[dateKey]) {
+            acc[dateKey] = 0;
+          }
+          acc[dateKey]++;
+          
+          return acc;
+        }, {} as Record<string, number>);
+
+        // Converter para array e formatar
+        const quantityData = Object.entries(quantityByDay)
+          .map(([date, count]) => ({
+            date: new Date(date).toISOString(),
+            count: count,
+          }))
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
         console.log("Quantity data:", quantityData);
 
         return NextResponse.json({
-          data: quantityData.map((item) => ({
-            date: item.created_at,
-            count: item._count.id,
-          })),
+          data: quantityData,
         });
 
       case "byCategory":

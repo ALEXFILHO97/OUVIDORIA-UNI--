@@ -98,6 +98,7 @@ export default function Dashboard({ initialData }: DashboardProps) {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange]);
 
   const clearFilters = () => {

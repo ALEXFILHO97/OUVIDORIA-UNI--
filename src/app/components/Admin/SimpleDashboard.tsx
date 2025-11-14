@@ -76,6 +76,7 @@ export default function SimpleDashboard({ initialData }: SimpleDashboardProps) {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange]);
 
   const clearFilters = () => {
