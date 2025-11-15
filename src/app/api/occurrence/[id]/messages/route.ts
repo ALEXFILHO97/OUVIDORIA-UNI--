@@ -64,9 +64,24 @@ export async function POST(
     });
   }
   if (data.status) {
+    const updateData: any = {
+      status: data.status,
+    };
+
+    if (data.status === "DONE") {
+      const occurrence = await prisma.occurrence.findUnique({
+        where: { id },
+        select: { finished_in: true, status: true },
+      });
+
+      if (!occurrence?.finished_in || occurrence.status !== "DONE") {
+        updateData.finished_in = new Date();
+      }
+    }
+
     await prisma.occurrence.update({
       where: { id },
-      data: { status: data.status },
+      data: updateData,
     });
   }
 

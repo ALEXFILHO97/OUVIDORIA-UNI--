@@ -196,14 +196,16 @@ export default function SimpleDashboard({ initialData }: SimpleDashboardProps) {
           <CardContent>
             <div className="text-2xl font-bold">
               {data.resolutionDuration.length > 0
-                ? Math.round(
-                    data.resolutionDuration.reduce(
+                ? (() => {
+                    const avg = data.resolutionDuration.reduce(
                       (sum, item) => sum + item.duration,
                       0
-                    ) / data.resolutionDuration.length
-                  )
-                : 0}
-              h
+                    ) / data.resolutionDuration.length;
+                    return avg < 1 
+                      ? `${Math.round(avg * 60)}min` 
+                      : `${avg.toFixed(1)}h`;
+                  })()
+                : "0h"}
             </div>
             <p className="text-xs text-muted-foreground">
               Horas em média
@@ -335,7 +337,16 @@ export default function SimpleDashboard({ initialData }: SimpleDashboardProps) {
                         {item.category}
                       </div>
                       <div className="text-lg font-semibold">
-                        {item.duration}h
+                        {item.duration < 1 
+                          ? (() => {
+                              const minutes = Math.floor(item.duration * 60);
+                              const seconds = Math.round((item.duration * 60 - minutes) * 60);
+                              if (minutes === 0 && seconds === 0) return "1min";
+                              if (minutes === 0) return `${seconds}s`;
+                              if (seconds === 0) return `${minutes}min`;
+                              return `${minutes}min ${seconds}s`;
+                            })()
+                          : `${item.duration.toFixed(1)}h`}
                       </div>
                       <div className="text-xs text-gray-500">
                         Criado: {format(new Date(item.created_at), "dd/MM/yyyy", {

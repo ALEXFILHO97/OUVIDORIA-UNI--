@@ -100,14 +100,15 @@ export default async function Relatorios() {
     resolutionDuration: durationData.map((occurrence) => {
       const created = new Date(occurrence.created_at);
       const finished = new Date(occurrence.finished_in!);
-      const durationHours = Math.round(
-        (finished.getTime() - created.getTime()) / (1000 * 60 * 60)
-      );
+      
+      const durationMs = finished.getTime() - created.getTime();
+      const durationHours = durationMs / (1000 * 60 * 60);
+      const roundedHours = durationHours > 0 ? Math.max(0.01, Math.round(durationHours * 100) / 100) : 0.01;
 
       return {
         id: occurrence.id,
         category: occurrence.category.name,
-        duration: durationHours,
+        duration: roundedHours,
         created_at: occurrence.created_at.toISOString(),
         finished_in: occurrence.finished_in!.toISOString(),
       };

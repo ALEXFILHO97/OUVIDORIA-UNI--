@@ -8,24 +8,33 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get("endDate");
     const reportType = searchParams.get("type");
 
-    console.log("API Reports - Parâmetros:", { startDate, endDate, reportType });
-
-    const whereClause: any = {};
-
-    if (startDate && endDate) {
-      whereClause.created_at = {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
-      };
-    }
-
-    console.log("Where clause:", whereClause);
+    const adjustDateRange = (start: string | null, end: string | null) => {
+      if (!start || !end) return null;
+      
+      const startDate = new Date(start);
+      startDate.setHours(0, 0, 0, 0);
+      
+      const endDate = new Date(end);
+      endDate.setHours(23, 59, 59, 999);
+      
+      return { start: startDate, end: endDate };
+    };
 
     switch (reportType) {
       case "quantity":
-        // Buscar todas as ocorrências no período
+        const quantityWhereClause: any = {};
+        if (startDate && endDate) {
+          const dateRange = adjustDateRange(startDate, endDate);
+          if (dateRange) {
+            quantityWhereClause.created_at = {
+              gte: dateRange.start,
+              lte: dateRange.end,
+            };
+          }
+        }
+        
         const occurrences = await prisma.occurrence.findMany({
-          where: whereClause,
+          where: quantityWhereClause,
           select: {
             created_at: true,
           },
@@ -34,10 +43,8 @@ export async function GET(request: NextRequest) {
           },
         });
 
-        // Agrupar por dia (ignorando hora, minuto, segundo)
         const quantityByDay = occurrences.reduce((acc, occurrence) => {
           const date = new Date(occurrence.created_at);
-          // Criar chave apenas com data (YYYY-MM-DD)
           const dateKey = date.toISOString().split('T')[0];
           
           if (!acc[dateKey]) {
@@ -48,7 +55,6 @@ export async function GET(request: NextRequest) {
           return acc;
         }, {} as Record<string, number>);
 
-        // Converter para array e formatar
         const quantityData = Object.entries(quantityByDay)
           .map(([date, count]) => ({
             date: new Date(date).toISOString(),
@@ -56,16 +62,25 @@ export async function GET(request: NextRequest) {
           }))
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-        console.log("Quantity data:", quantityData);
-
         return NextResponse.json({
           data: quantityData,
         });
 
       case "byCategory":
+        const categoryWhereClause: any = {};
+        if (startDate && endDate) {
+          const dateRange = adjustDateRange(startDate, endDate);
+          if (dateRange) {
+            categoryWhereClause.created_at = {
+              gte: dateRange.start,
+              lte: dateRange.end,
+            };
+          }
+        }
+        
         const categoryData = await prisma.occurrence.groupBy({
           by: ["categoryId"],
-          where: whereClause,
+          where: categoryWhereClause,
           _count: {
             id: true,
           },
@@ -92,17 +107,29 @@ export async function GET(request: NextRequest) {
         });
 
       case "resolutionDuration":
-        const resolutionData = await prisma.occurrence.findMany({
-          where: {
-            ...whereClause,
-            finished_in: {
-              not: null,
-            },
+        const durationWhereClause: any = {
+          finished_in: {
+            not: null,
           },
+        };
+
+        if (startDate && endDate) {
+          const dateRange = adjustDateRange(startDate, endDate);
+          if (dateRange) {
+            durationWhereClause.finished_in = {
+              gte: dateRange.start,
+              lte: dateRange.end,
+            };
+          }
+        }
+
+        const resolutionData = await prisma.occurrence.findMany({
+          where: durationWhereClause,
           select: {
             id: true,
             created_at: true,
             finished_in: true,
+            status: true,
             category: {
               select: {
                 name: true,
@@ -111,17 +138,19 @@ export async function GET(request: NextRequest) {
           },
         });
 
-        const durationData = resolutionData.map((occurrence) => {
+        const validResolutionData = resolutionData.filter((occ) => occ.finished_in !== null);
+
+        const durationData = validResolutionData.map((occurrence) => {
           const created = new Date(occurrence.created_at);
-          const finished = new Date(occurrence.finished_in!);
-          const durationHours = Math.round(
-            (finished.getTime() - created.getTime()) / (1000 * 60 * 60)
-          );
+          const finished = occurrence.finished_in ? new Date(occurrence.finished_in) : new Date(occurrence.created_at);
+          const durationMs = finished.getTime() - created.getTime();
+          const durationHours = durationMs / (1000 * 60 * 60);
+          const roundedHours = durationHours > 0 ? Math.max(0.01, Math.round(durationHours * 100) / 100) : 0.01;
 
           return {
             id: occurrence.id,
             category: occurrence.category.name,
-            duration: durationHours,
+            duration: roundedHours,
             created_at: occurrence.created_at,
             finished_in: occurrence.finished_in,
           };

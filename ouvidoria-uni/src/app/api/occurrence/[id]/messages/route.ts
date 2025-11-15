@@ -64,9 +64,42 @@ export async function POST(
     });
   }
   if (data.status) {
-    await prisma.occurrence.update({
+    const updateData: { status: string; finished_in?: Date } = {
+      status: data.status,
+    };
+
+    // Se o status for DONE, sempre define finished_in (se mudando de outro status para DONE)
+    if (data.status === "DONE") {
+      const occurrence = await prisma.occurrence.findUnique({
+        where: { id },
+        select: { finished_in: true, status: true },
+      });
+
+      console.log(`[API Messages] Atualizando status para DONE. Ocorrência ${id}:`, {
+        finished_in_atual: occurrence?.finished_in,
+        status_atual: occurrence?.status,
+        novo_status: data.status,
+      });
+
+      // Se está mudando de outro status para DONE, ou se já é DONE mas não tem finished_in
+      if (occurrence?.status !== "DONE" || !occurrence?.finished_in) {
+        updateData.finished_in = new Date();
+        console.log(`[API Messages] Definindo finished_in para ocorrência ${id}:`, updateData.finished_in);
+      } else {
+        console.log(`[API Messages] Ocorrência ${id} já é DONE e possui finished_in:`, occurrence.finished_in);
+      }
+    }
+
+    console.log(`[API Messages] Atualizando ocorrência ${id} com dados:`, updateData);
+
+    const updated = await prisma.occurrence.update({
       where: { id },
-      data: { status: data.status },
+      data: updateData,
+    });
+
+    console.log(`[API Messages] Ocorrência ${id} atualizada:`, {
+      status: updated.status,
+      finished_in: updated.finished_in,
     });
   }
 
